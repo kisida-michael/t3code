@@ -2,7 +2,8 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
@@ -944,7 +945,16 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
 
 const cliRuntimeLayer = Layer.mergeAll(Logger.layer([Logger.consolePretty()]), NodeServices.layer);
 
-if (import.meta.main) {
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) {
+    return false;
+  }
+
+  return resolve(entry) === fileURLToPath(import.meta.url);
+}
+
+if (isMainModule()) {
   Command.run(buildDesktopArtifactCli, { version: "0.0.0" }).pipe(
     Effect.scoped,
     Effect.provide(cliRuntimeLayer),
