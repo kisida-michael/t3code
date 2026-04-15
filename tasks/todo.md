@@ -2,6 +2,17 @@
 
 ## Plan
 
+- [x] Inspect desktop update feed and release workflow assumptions to identify what blocks fork-based releases and updates.
+- [x] Patch local builds and GitHub Actions so desktop artifacts built from this fork target fork-hosted GitHub releases for updates.
+- [ ] Enable the Release workflow on the fork and document the fork release process and remaining secret requirements.
+- [x] Verify formatting, lint, and typecheck after the release/fork changes.
+
+## Notes
+
+- User wants packaged DMGs, update feeds, and release CI to work from the `kisida-michael/t3code` fork instead of upstream.
+
+## Plan
+
 - [x] Inspect the repo git remote/config state and confirm the local-only integration update strategy can be applied safely.
 - [x] Configure repo-local git conflict memory and an `upstream` remote alias for the canonical source repo.
 - [x] Add a repeatable local update helper for rebasing or rebuilding the local Copilot overlay onto upstream changes.
@@ -45,6 +56,11 @@
 - External dependency: local `copilot` CLI is installed at `/opt/homebrew/bin/copilot` and supports `--acp`, but the installed version is `1.0.5` while `1.0.26` is available.
 
 ## Review
+
+- Fork desktop release/update wiring now works without upstream-only assumptions:
+  local packaged builds infer the GitHub update repository from git remotes in priority order `fork`, `origin`, `upstream`, and the release workflow skips npm publish plus stable finalize/version-bump jobs when running outside `pingdotgg/t3code`.
+- Updated [release.md](/Users/michaelkisida/t3code/docs/release.md:1) with fork-release behavior, required setup, and the remaining optional signing secret requirements.
+- Verified with `bun fmt`, `bun lint`, and `bun typecheck`; lint still reports the same unrelated web warnings, and typecheck still reports the same non-failing Copilot adapter Effect advisories.
 
 - Added repo-local conflict memory with `rerere.enabled=true` and `rerere.autoupdate=true`, and added an `upstream` remote alias pointing at `https://github.com/pingdotgg/t3code.git`.
 - Added [update-local-copilot.sh](/Users/michaelkisida/t3code/scripts/update-local-copilot.sh:1) plus a root script alias `bun update:local-copilot` for the two supported maintenance flows: `rebase` and `refresh` (fresh upstream branch plus cherry-picks).

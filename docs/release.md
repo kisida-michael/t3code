@@ -53,6 +53,7 @@ This document covers the unified release workflow for stable and nightly desktop
 - Repository slug source:
   - `T3CODE_DESKTOP_UPDATE_REPOSITORY` (format `owner/repo`), if set.
   - otherwise `GITHUB_REPOSITORY` from GitHub Actions.
+  - otherwise local git remotes in priority order: `fork`, `origin`, `upstream`.
 - Temporary private-repo auth workaround:
   - set `T3CODE_DESKTOP_UPDATE_GITHUB_TOKEN` (or `GH_TOKEN`) in the desktop app runtime environment.
   - the app forwards it as an `Authorization: Bearer <token>` request header for updater HTTP calls.
@@ -63,6 +64,33 @@ This document covers the unified release workflow for stable and nightly desktop
 - macOS metadata note:
   - `electron-updater` reads `latest-mac.yml` on stable and `nightly-mac.yml` on nightly, for both Intel and Apple Silicon.
   - The workflow merges the per-arch mac manifests into one channel-specific mac manifest before publishing the GitHub Release.
+
+## Fork releases
+
+This workflow can publish desktop releases from a personal fork.
+
+Behavior on forks:
+
+- GitHub Releases still publish normally to the fork repository.
+- Desktop updater metadata in packaged artifacts points at the fork repo because
+  `GITHUB_REPOSITORY` is set by GitHub Actions.
+- The workflow skips upstream-only jobs on forks:
+  - npm CLI publish
+  - stable-version bump/finalize push back to `main`
+
+Required one-time fork setup:
+
+1. Enable the disabled-by-default `Release` workflow on the fork.
+2. Optionally add signing secrets if you want signed macOS or Windows artifacts.
+3. Push a tag or run `workflow_dispatch` from the fork branch you want to release.
+
+Notes:
+
+- Unsigned DMGs can still be built and attached to GitHub Releases, but macOS
+  will warn users because the app is not signed/notarized.
+- Local packaged builds can also target the fork update feed without setting
+  `T3CODE_DESKTOP_UPDATE_REPOSITORY` if the repo has a `fork` remote pointing at
+  GitHub.
 
 ## 0) npm OIDC trusted publishing setup (CLI)
 
