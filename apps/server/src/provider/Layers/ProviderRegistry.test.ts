@@ -30,6 +30,7 @@ import {
   readCodexConfigModelProvider,
 } from "./CodexProvider";
 import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./ClaudeProvider";
+import { modelsFromSessionConfigOptions, parseModelsFromHelp } from "./GitHubCopilotProvider";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerConfig } from "../../config";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
@@ -1244,6 +1245,53 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         });
         assert.strictEqual(parsed.status, "warning");
         assert.strictEqual(parsed.auth.status, "unknown");
+      });
+    });
+
+    describe("parseModelsFromHelp", () => {
+      it("falls back when current copilot help advertises output-format choices later in the help text", () => {
+        const models = parseModelsFromHelp({
+          stdout: `Usage: copilot [options] [command]
+
+Options:
+  --mode <mode>                         Set the initial agent mode (choices:
+                                        "interactive", "plan", "autopilot")
+  --model <model>                       Set the AI model to use
+  --output-format <format>              Output format: 'text' (default) or
+                                        'json' (JSONL, one JSON object per line)
+                                        (choices: "text", "json")
+`,
+          stderr: "",
+          code: 0,
+        });
+
+        assert.deepStrictEqual(
+          models.map((model) => model.slug),
+          ["gpt-5-mini", "gpt-4.1", "claude-haiku-4.5"],
+        );
+      });
+    });
+
+    describe("modelsFromSessionConfigOptions", () => {
+      it("extracts concrete model choices from ACP session config", () => {
+        const models = modelsFromSessionConfigOptions([
+          {
+            id: "model",
+            name: "Model",
+            description: "Select a model",
+            type: "select",
+            currentValue: "gpt-5.2",
+            options: [
+              { name: "GPT-5.2", value: "gpt-5.2" },
+              { name: "Claude Sonnet 4.6", value: "claude-sonnet-4.6" },
+            ],
+          },
+        ]);
+
+        assert.deepStrictEqual(
+          models.map((model) => model.slug),
+          ["gpt-5.2", "claude-sonnet-4.6"],
+        );
       });
     });
   },
