@@ -49,6 +49,9 @@
 - Added repo-local conflict memory with `rerere.enabled=true` and `rerere.autoupdate=true`, and added an `upstream` remote alias pointing at `https://github.com/pingdotgg/t3code.git`.
 - Added [update-local-copilot.sh](/Users/michaelkisida/t3code/scripts/update-local-copilot.sh:1) plus a root script alias `bun update:local-copilot` for the two supported maintenance flows: `rebase` and `refresh` (fresh upstream branch plus cherry-picks).
 - Documented the workflow in [local-copilot-overlay.md](/Users/michaelkisida/t3code/docs/local-copilot-overlay.md:1), including branch model, conflict handling, and validation steps.
+- Created the dedicated overlay branch `local/github-copilot` with a small local commit stack:
+  `111b6f2b feat(local): add github copilot provider overlay`
+  `bb1ac8f6 chore(local): add update workflow and desktop runtime fixes`
 - Verified with `bun fmt`, `bun lint`, and `bun typecheck`; lint still reports the same unrelated web warnings, and typecheck still reports the same non-failing Copilot adapter Effect advisories.
 
 - Cleared stale production pending-request state directly in `~/.t3/userdata/state.sqlite` after creating a consistent SQLite backup at `/Users/michaelkisida/.t3/userdata/state.sqlite.pending-approvals-backup-20260414-231451`.
