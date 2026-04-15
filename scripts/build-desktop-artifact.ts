@@ -112,6 +112,49 @@ function resolveGitCommitHash(repoRoot: string): string {
   return hash.toLowerCase();
 }
 
+function parseGitHubRepositorySlug(rawRemoteUrl: string | undefined): string | undefined {
+  const trimmed = rawRemoteUrl?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const normalized = trimmed
+    .replace(/^git@github\.com:/, "https://github.com/")
+    .replace(/\.git$/, "");
+  const match = normalized.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/i);
+  if (!match?.[1] || !match[2]) {
+    return undefined;
+  }
+
+  return `${match[1]}/${match[2]}`;
+}
+
+function resolveGitHubRepositoryFromRemote(
+  repoRoot: string,
+  remoteName: string,
+): string | undefined {
+  const result = spawnSync("git", ["remote", "get-url", remoteName], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    return undefined;
+  }
+
+  return parseGitHubRepositorySlug(result.stdout);
+}
+
+function resolveLocalGitHubRepository(repoRoot: string): string | undefined {
+  for (const remoteName of ["fork", "origin", "upstream"]) {
+    const repository = resolveGitHubRepositoryFromRemote(repoRoot, remoteName);
+    if (repository) {
+      return repository;
+    }
+  }
+
+  return undefined;
+}
+
 function resolvePythonForNodeGyp(): string | undefined {
   const configured = process.env.npm_config_python ?? process.env.PYTHON;
   if (configured && existsSync(configured)) {
@@ -452,7 +495,10 @@ function resolveDesktopRuntimeDependencies(
   return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
 }
 
-function resolveGitHubPublishConfig(updateChannel: "latest" | "nightly"):
+function resolveGitHubPublishConfig(
+  repoRoot: string,
+  updateChannel: "latest" | "nightly",
+):
   | {
       readonly provider: "github";
       readonly owner: string;
@@ -464,6 +510,7 @@ function resolveGitHubPublishConfig(updateChannel: "latest" | "nightly"):
   const rawRepo =
     process.env.T3CODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
     process.env.GITHUB_REPOSITORY?.trim() ||
+    resolveLocalGitHubRepository(repoRoot) ||
     "";
   if (!rawRepo) return undefined;
 
@@ -526,7 +573,8 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     },
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
-  const publishConfig = resolveGitHubPublishConfig(updateChannel);
+  const repoRoot = yield* RepoRoot;
+  const publishConfig = resolveGitHubPublishConfig(repoRoot, updateChannel);
   if (publishConfig) {
     buildConfig.publish = [publishConfig];
   } else if (mockUpdates) {
