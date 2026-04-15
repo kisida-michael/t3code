@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./environment";
 export * from "./ipc";
 export * from "./terminal";
+export * from "./providerCatalog";
 export * from "./provider";
 export * from "./providerRuntime";
 export * from "./model";

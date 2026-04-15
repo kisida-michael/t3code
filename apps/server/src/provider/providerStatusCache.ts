@@ -1,8 +1,12 @@
 import * as nodePath from "node:path";
-import { type ServerProvider, ServerProvider as ServerProviderSchema } from "@t3tools/contracts";
+import {
+  PROVIDER_SETTINGS_ORDER,
+  type ServerProvider,
+  ServerProvider as ServerProviderSchema,
+} from "@t3tools/contracts";
 import { Cause, Effect, FileSystem, Path, Schema } from "effect";
 
-export const PROVIDER_CACHE_IDS = ["codex", "claudeAgent"] as const satisfies ReadonlyArray<
+export const PROVIDER_CACHE_IDS = PROVIDER_SETTINGS_ORDER satisfies ReadonlyArray<
   ServerProvider["provider"]
 >;
 

@@ -1,8 +1,13 @@
 import {
+  type ClaudeModelOptions,
+  type CodexModelOptions,
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
+  type GitHubCopilotModelOptions,
   type ModelSelection,
   type ProviderKind,
+  type ProviderModelOptions,
   type ServerProvider,
+  PROVIDER_KINDS,
 } from "@t3tools/contracts";
 import { normalizeModelSlug, resolveSelectableModel } from "@t3tools/shared/model";
 import { getComposerProviderState } from "./components/chat/composerProviderRegistry";
@@ -30,6 +35,27 @@ export interface AppModelOption {
   isCustom: boolean;
 }
 
+export function buildModelSelection(
+  provider: ProviderKind,
+  model: string,
+  options?: ProviderModelOptions[ProviderKind],
+): ModelSelection {
+  switch (provider) {
+    case "codex":
+      return options
+        ? { provider, model, options: options as CodexModelOptions }
+        : { provider, model };
+    case "claudeAgent":
+      return options
+        ? { provider, model, options: options as ClaudeModelOptions }
+        : { provider, model };
+    case "githubCopilot":
+      return options
+        ? { provider, model, options: options as GitHubCopilotModelOptions }
+        : { provider, model };
+  }
+}
+
 const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConfig> = {
   codex: {
     provider: "codex",
@@ -44,6 +70,13 @@ const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConf
     description: "Save additional Claude model slugs for the picker and `/model` command.",
     placeholder: "your-claude-model-slug",
     example: "claude-sonnet-5-0",
+  },
+  githubCopilot: {
+    provider: "githubCopilot",
+    title: "GitHub Copilot",
+    description: "Save additional GitHub Copilot model slugs for the picker and `/model` command.",
+    placeholder: "your-copilot-model-slug",
+    example: "gpt-5-mini",
   },
 };
 
@@ -137,12 +170,17 @@ export function resolveAppModelSelection(
   settings: UnifiedSettings,
   providers: ReadonlyArray<ServerProvider>,
   selectedModel: string | null | undefined,
+  allowedProviders?: ReadonlyArray<ProviderKind>,
 ): string {
-  const resolvedProvider = resolveSelectableProvider(providers, provider);
-  const options = getAppModelOptions(settings, providers, resolvedProvider, selectedModel);
+  const scopedProviders =
+    allowedProviders === undefined
+      ? providers
+      : providers.filter((candidate) => allowedProviders.includes(candidate.provider));
+  const resolvedProvider = resolveSelectableProvider(scopedProviders, provider);
+  const options = getAppModelOptions(settings, scopedProviders, resolvedProvider, selectedModel);
   return (
     resolveSelectableModel(resolvedProvider, selectedModel, options) ??
-    getDefaultServerModel(providers, resolvedProvider)
+    getDefaultServerModel(scopedProviders, resolvedProvider)
   );
 }
 
@@ -151,50 +189,61 @@ export function getCustomModelOptionsByProvider(
   providers: ReadonlyArray<ServerProvider>,
   selectedProvider?: ProviderKind | null,
   selectedModel?: string | null,
+  allowedProviders?: ReadonlyArray<ProviderKind>,
 ): Record<ProviderKind, ReadonlyArray<{ slug: string; name: string }>> {
-  return {
-    codex: getAppModelOptions(
-      settings,
-      providers,
-      "codex",
-      selectedProvider === "codex" ? selectedModel : undefined,
-    ),
-    claudeAgent: getAppModelOptions(
-      settings,
-      providers,
-      "claudeAgent",
-      selectedProvider === "claudeAgent" ? selectedModel : undefined,
-    ),
-  };
+  const scopedProviders =
+    allowedProviders === undefined
+      ? providers
+      : providers.filter((candidate) => allowedProviders.includes(candidate.provider));
+  const result = {} as Record<ProviderKind, ReadonlyArray<{ slug: string; name: string }>>;
+  for (const provider of PROVIDER_KINDS) {
+    result[provider] =
+      allowedProviders !== undefined && !allowedProviders.includes(provider)
+        ? []
+        : getAppModelOptions(
+            settings,
+            scopedProviders,
+            provider,
+            selectedProvider === provider ? selectedModel : undefined,
+          );
+  }
+  return result;
 }
 
 export function resolveAppModelSelectionState(
   settings: UnifiedSettings,
   providers: ReadonlyArray<ServerProvider>,
+  allowedProviders?: ReadonlyArray<ProviderKind>,
 ): ModelSelection {
+  const scopedProviders =
+    allowedProviders === undefined
+      ? providers
+      : providers.filter((candidate) => allowedProviders.includes(candidate.provider));
   const selection = settings.textGenerationModelSelection ?? {
     provider: "codex" as const,
     model: DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER.codex,
   };
-  const provider = resolveSelectableProvider(providers, selection.provider);
+  const provider = resolveSelectableProvider(scopedProviders, selection.provider);
 
   // When the provider changed due to fallback (e.g. selected provider was disabled),
   // don't carry over the old provider's model — use the fallback provider's default.
   const selectedModel = provider === selection.provider ? selection.model : null;
-  const model = resolveAppModelSelection(provider, settings, providers, selectedModel);
+  const model = resolveAppModelSelection(
+    provider,
+    settings,
+    scopedProviders,
+    selectedModel,
+    allowedProviders,
+  );
   const { modelOptionsForDispatch } = getComposerProviderState({
     provider,
     model,
-    models: getProviderModels(providers, provider),
+    models: getProviderModels(scopedProviders, provider),
     prompt: "",
     modelOptions: {
       [provider]: provider === selection.provider ? selection.options : undefined,
     },
   });
 
-  return {
-    provider,
-    model,
-    ...(modelOptionsForDispatch ? { options: modelOptionsForDispatch } : {}),
-  };
+  return buildModelSelection(provider, model, modelOptionsForDispatch);
 }
