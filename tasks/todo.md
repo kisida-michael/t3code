@@ -5,7 +5,7 @@
 - [x] Inspect the GitHub Copilot model discovery path and replace the fragile CLI-help parsing that now misclassifies `text/json` as models.
 - [x] Add focused regression coverage for current Copilot CLI help output so `--output-format` choices cannot leak into the provider model list.
 - [x] Validate with `bun fmt`, `bun lint`, and `bun typecheck`.
-- [ ] Commit the fix, push a branch, and open a draft PR on the fork.
+- [x] Commit the fix, push a branch, and open a draft PR on the fork.
 
 ## Notes
 
@@ -17,6 +17,7 @@
 - Provider status now prefers real Copilot ACP session `configOptions` for model discovery, and only falls back to safe built-in models when the session probe is unavailable.
 - Added regression coverage in [ProviderRegistry.test.ts](/Users/michaelkisida/t3code/apps/server/src/provider/Layers/ProviderRegistry.test.ts:1) for both the current CLI help shape and ACP-derived model options.
 - Verified with `bun fmt`, `bun lint`, `bun typecheck`, and `cd apps/server && bun run test src/provider/Layers/ProviderRegistry.test.ts`.
+- Published commit `da59865e` on branch `codex/copilot-model-discovery-fix` and opened draft PR [#1](https://github.com/kisida-michael/t3code/pull/1) against `kisida-michael/t3code:local/github-copilot`.
 
 ## Plan
 
