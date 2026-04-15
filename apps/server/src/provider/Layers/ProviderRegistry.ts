@@ -3,16 +3,23 @@
  *
  * @module ProviderRegistryLive
  */
-import type { ProviderKind, ServerProvider } from "@t3tools/contracts";
+import {
+  PROVIDER_SETTINGS_ORDER,
+  type ProviderKind,
+  type ServerProvider,
+} from "@t3tools/contracts";
 import { Effect, Equal, FileSystem, Layer, Path, PubSub, Ref, Stream } from "effect";
 
 import { ServerConfig } from "../../config";
 import { ClaudeProviderLive } from "./ClaudeProvider";
 import { CodexProviderLive } from "./CodexProvider";
+import { GitHubCopilotProviderLive } from "./GitHubCopilotProvider";
 import type { ClaudeProviderShape } from "../Services/ClaudeProvider";
 import { ClaudeProvider } from "../Services/ClaudeProvider";
 import type { CodexProviderShape } from "../Services/CodexProvider";
 import { CodexProvider } from "../Services/CodexProvider";
+import type { GitHubCopilotProviderShape } from "../Services/GitHubCopilotProvider";
+import { GitHubCopilotProvider } from "../Services/GitHubCopilotProvider";
 import { ProviderRegistry, type ProviderRegistryShape } from "../Services/ProviderRegistry";
 import {
   hydrateCachedProvider,
@@ -23,13 +30,21 @@ import {
   writeProviderStatusCache,
 } from "../providerStatusCache";
 
+type ProviderServiceByKind = {
+  codex: CodexProviderShape;
+  claudeAgent: ClaudeProviderShape;
+  githubCopilot: GitHubCopilotProviderShape;
+};
+
 const loadProviders = (
-  codexProvider: CodexProviderShape,
-  claudeProvider: ClaudeProviderShape,
-): Effect.Effect<readonly [ServerProvider, ServerProvider]> =>
-  Effect.all([codexProvider.getSnapshot, claudeProvider.getSnapshot], {
-    concurrency: "unbounded",
-  });
+  providersByKind: ProviderServiceByKind,
+): Effect.Effect<ReadonlyArray<ServerProvider>> =>
+  Effect.all(
+    PROVIDER_SETTINGS_ORDER.map((provider) => providersByKind[provider].getSnapshot),
+    {
+      concurrency: "unbounded",
+    },
+  );
 
 export const haveProvidersChanged = (
   previousProviders: ReadonlyArray<ServerProvider>,
@@ -41,6 +56,12 @@ export const ProviderRegistryLive = Layer.effect(
   Effect.gen(function* () {
     const codexProvider = yield* CodexProvider;
     const claudeProvider = yield* ClaudeProvider;
+    const githubCopilotProvider = yield* GitHubCopilotProvider;
+    const providersByKind: ProviderServiceByKind = {
+      codex: codexProvider,
+      claudeAgent: claudeProvider,
+      githubCopilot: githubCopilotProvider,
+    };
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -48,7 +69,7 @@ export const ProviderRegistryLive = Layer.effect(
       PubSub.unbounded<ReadonlyArray<ServerProvider>>(),
       PubSub.shutdown,
     );
-    const fallbackProviders = yield* loadProviders(codexProvider, claudeProvider);
+    const fallbackProviders = yield* loadProviders(providersByKind);
     const cachePathByProvider = new Map(
       PROVIDER_CACHE_IDS.map(
         (provider) =>
@@ -147,39 +168,30 @@ export const ProviderRegistryLive = Layer.effect(
     });
 
     const refresh = Effect.fn("refresh")(function* (provider?: ProviderKind) {
-      switch (provider) {
-        case "codex":
-          return yield* codexProvider.refresh.pipe(
-            Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
-          );
-        case "claudeAgent":
-          return yield* claudeProvider.refresh.pipe(
-            Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
-          );
-        default:
-          return yield* Effect.all(
-            [
-              codexProvider.refresh.pipe(
-                Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
-              ),
-              claudeProvider.refresh.pipe(
-                Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
-              ),
-            ],
-            {
-              concurrency: "unbounded",
-              discard: true,
-            },
-          ).pipe(Effect.andThen(Ref.get(providersRef)));
+      if (provider) {
+        return yield* providersByKind[provider].refresh.pipe(
+          Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
+        );
       }
+
+      return yield* Effect.all(
+        PROVIDER_SETTINGS_ORDER.map((providerKind) =>
+          providersByKind[providerKind].refresh.pipe(
+            Effect.flatMap((nextProvider) => syncProvider(nextProvider)),
+          ),
+        ),
+        {
+          concurrency: "unbounded",
+          discard: true,
+        },
+      ).pipe(Effect.andThen(Ref.get(providersRef)));
     });
 
-    yield* Stream.runForEach(codexProvider.streamChanges, (provider) =>
-      syncProvider(provider),
-    ).pipe(Effect.forkScoped);
-    yield* Stream.runForEach(claudeProvider.streamChanges, (provider) =>
-      syncProvider(provider),
-    ).pipe(Effect.forkScoped);
+    for (const provider of PROVIDER_SETTINGS_ORDER) {
+      yield* Stream.runForEach(providersByKind[provider].streamChanges, (nextProvider) =>
+        syncProvider(nextProvider),
+      ).pipe(Effect.forkScoped);
+    }
 
     return {
       getProviders: Ref.get(providersRef),
@@ -193,4 +205,8 @@ export const ProviderRegistryLive = Layer.effect(
       },
     } satisfies ProviderRegistryShape;
   }),
-).pipe(Layer.provideMerge(CodexProviderLive), Layer.provideMerge(ClaudeProviderLive));
+).pipe(
+  Layer.provideMerge(CodexProviderLive),
+  Layer.provideMerge(ClaudeProviderLive),
+  Layer.provideMerge(GitHubCopilotProviderLive),
+);

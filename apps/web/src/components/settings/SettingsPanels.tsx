@@ -43,6 +43,7 @@ import {
 } from "../../lib/desktopUpdateReactQuery";
 import {
   MAX_CUSTOM_MODEL_LENGTH,
+  buildModelSelection,
   getCustomModelOptionsByProvider,
   resolveAppModelSelectionState,
 } from "../../modelSelection";
@@ -125,7 +126,15 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     binaryPlaceholder: "Claude binary path",
     binaryDescription: "Path to the Claude binary",
   },
+  {
+    provider: "githubCopilot",
+    title: "GitHub Copilot",
+    binaryPlaceholder: "GitHub Copilot binary path",
+    binaryDescription: "Path to the GitHub Copilot CLI binary",
+  },
 ] as const;
+
+const GIT_TEXT_GENERATION_PROVIDERS: ReadonlyArray<ProviderKind> = ["codex", "claudeAgent"];
 
 const PROVIDER_STATUS_STYLES = {
   disabled: {
@@ -509,12 +518,20 @@ export function GeneralSettingsPanel() {
         DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.binaryPath ||
       settings.providers.claudeAgent.customModels.length > 0,
     ),
+    githubCopilot: Boolean(
+      settings.providers.githubCopilot.binaryPath !==
+        DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.binaryPath ||
+      settings.providers.githubCopilot.configDir !==
+        DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.configDir ||
+      settings.providers.githubCopilot.customModels.length > 0,
+    ),
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
     codex: "",
     claudeAgent: "",
+    githubCopilot: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
@@ -555,7 +572,11 @@ export function GeneralSettingsPanel() {
     return exports.length > 0 ? `${mode}. OTLP exporting ${exports.join(" and ")}.` : `${mode}.`;
   })();
 
-  const textGenerationModelSelection = resolveAppModelSelectionState(settings, serverProviders);
+  const textGenerationModelSelection = resolveAppModelSelectionState(
+    settings,
+    serverProviders,
+    GIT_TEXT_GENERATION_PROVIDERS,
+  );
   const textGenProvider = textGenerationModelSelection.provider;
   const textGenModel = textGenerationModelSelection.model;
   const textGenModelOptions = textGenerationModelSelection.options;
@@ -564,6 +585,7 @@ export function GeneralSettingsPanel() {
     serverProviders,
     textGenProvider,
     textGenModel,
+    GIT_TEXT_GENERATION_PROVIDERS,
   );
   const isGitWritingModelDirty = !Equal.equals(
     settings.textGenerationModelSelection ?? null,
@@ -994,6 +1016,7 @@ export function GeneralSettingsPanel() {
                 model={textGenModel}
                 lockedProvider={null}
                 providers={serverProviders}
+                providerOptions={GIT_TEXT_GENERATION_PROVIDERS}
                 modelOptionsByProvider={gitModelOptionsByProvider}
                 triggerVariant="outline"
                 triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
@@ -1002,9 +1025,10 @@ export function GeneralSettingsPanel() {
                     textGenerationModelSelection: resolveAppModelSelectionState(
                       {
                         ...settings,
-                        textGenerationModelSelection: { provider, model },
+                        textGenerationModelSelection: buildModelSelection(provider, model),
                       },
                       serverProviders,
+                      GIT_TEXT_GENERATION_PROVIDERS,
                     ),
                   });
                 }}
@@ -1027,13 +1051,14 @@ export function GeneralSettingsPanel() {
                     textGenerationModelSelection: resolveAppModelSelectionState(
                       {
                         ...settings,
-                        textGenerationModelSelection: {
-                          provider: textGenProvider,
-                          model: textGenModel,
-                          ...(nextOptions ? { options: nextOptions } : {}),
-                        },
+                        textGenerationModelSelection: buildModelSelection(
+                          textGenProvider,
+                          textGenModel,
+                          nextOptions,
+                        ),
                       },
                       serverProviders,
+                      GIT_TEXT_GENERATION_PROVIDERS,
                     ),
                   });
                 }}
@@ -1242,6 +1267,40 @@ export function GeneralSettingsPanel() {
                               {providerCard.homeDescription}
                             </span>
                           ) : null}
+                        </label>
+                      </div>
+                    ) : null}
+
+                    {providerCard.provider === "githubCopilot" ? (
+                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                        <label
+                          htmlFor="provider-install-github-copilot-config-dir"
+                          className="block"
+                        >
+                          <span className="text-xs font-medium text-foreground">
+                            Copilot config directory
+                          </span>
+                          <Input
+                            id="provider-install-github-copilot-config-dir"
+                            className="mt-1.5"
+                            value={settings.providers.githubCopilot.configDir}
+                            onChange={(event) =>
+                              updateSettings({
+                                providers: {
+                                  ...settings.providers,
+                                  githubCopilot: {
+                                    ...settings.providers.githubCopilot,
+                                    configDir: event.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            placeholder="COPILOT_CONFIG_DIR"
+                            spellCheck={false}
+                          />
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Optional custom config directory passed to `copilot --config-dir`.
+                          </span>
                         </label>
                       </div>
                     ) : null}

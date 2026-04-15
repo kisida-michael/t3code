@@ -4,6 +4,7 @@ import {
   type ClaudeCodeEffort,
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type GitHubCopilotModelOptions,
   type ModelCapabilities,
   type ModelSelection,
   type ProviderKind,
@@ -97,6 +98,19 @@ export function normalizeCodexModelOptionsWithCapabilities(
       : {}),
     ...(fastMode !== undefined ? { fastMode } : {}),
   };
+  return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
+}
+
+export function normalizeGitHubCopilotModelOptionsWithCapabilities(
+  caps: ModelCapabilities,
+  modelOptions: GitHubCopilotModelOptions | null | undefined,
+): GitHubCopilotModelOptions | undefined {
+  const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
+  const nextOptions: GitHubCopilotModelOptions = reasoningEffort
+    ? {
+        reasoningEffort: reasoningEffort as GitHubCopilotModelOptions["reasoningEffort"],
+      }
+    : {};
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 }
 
@@ -216,6 +230,9 @@ export function resolveApiModelId(modelSelection: ModelSelection): string {
         default:
           return modelSelection.model;
       }
+    }
+    case "githubCopilot": {
+      return modelSelection.model;
     }
     default: {
       return modelSelection.model;

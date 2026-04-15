@@ -14,7 +14,7 @@ import {
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
   DEFAULT_SERVER_SETTINGS,
   type ModelSelection,
-  type ProviderKind,
+  PROVIDER_SETTINGS_ORDER,
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
@@ -91,8 +91,6 @@ export class ServerSettingsService extends Context.Service<
 
 const ServerSettingsJson = fromLenientJson(ServerSettings);
 
-const PROVIDER_ORDER: readonly ProviderKind[] = ["codex", "claudeAgent"];
-
 /**
  * Ensure the `textGenerationModelSelection` points to an enabled provider.
  * If the selected provider is disabled, fall back to the first enabled
@@ -105,7 +103,7 @@ function resolveTextGenerationProvider(settings: ServerSettings): ServerSettings
     return settings;
   }
 
-  const fallback = PROVIDER_ORDER.find((p) => settings.providers[p].enabled);
+  const fallback = PROVIDER_SETTINGS_ORDER.find((p) => settings.providers[p].enabled);
   if (!fallback) {
     // No providers enabled — return as-is; callers will report the error.
     return settings;

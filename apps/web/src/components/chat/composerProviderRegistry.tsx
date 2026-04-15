@@ -12,6 +12,7 @@ import { TraitsMenuContent, TraitsPicker } from "./TraitsPicker";
 import {
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeGitHubCopilotModelOptionsWithCapabilities,
 } from "@t3tools/shared/model";
 
 export type ComposerProviderStateInput = {
@@ -79,10 +80,27 @@ function getProviderStateFromCapabilities(
   const promptEffort = resolveEffort(caps, rawEffort) ?? null;
 
   // Normalize options for dispatch
-  const normalizedOptions =
-    provider === "codex"
-      ? normalizeCodexModelOptionsWithCapabilities(caps, providerOptions)
-      : normalizeClaudeModelOptionsWithCapabilities(caps, providerOptions);
+  let normalizedOptions: ProviderModelOptions[ProviderKind] | undefined;
+  switch (provider) {
+    case "codex":
+      normalizedOptions = normalizeCodexModelOptionsWithCapabilities(
+        caps,
+        providerOptions as ProviderModelOptions["codex"],
+      );
+      break;
+    case "githubCopilot":
+      normalizedOptions = normalizeGitHubCopilotModelOptionsWithCapabilities(
+        caps,
+        providerOptions as ProviderModelOptions["githubCopilot"],
+      );
+      break;
+    case "claudeAgent":
+      normalizedOptions = normalizeClaudeModelOptionsWithCapabilities(
+        caps,
+        providerOptions as ProviderModelOptions["claudeAgent"],
+      );
+      break;
+  }
 
   // Ultrathink styling (driven by capabilities data, not provider identity)
   const ultrathinkActive =
@@ -181,6 +199,51 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
       !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
         <TraitsPicker
           provider="claudeAgent"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+  },
+  githubCopilot: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsMenuContent
+          provider="githubCopilot"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+    renderTraitsPicker: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsPicker
+          provider="githubCopilot"
           models={models}
           {...(threadRef ? { threadRef } : {})}
           {...(draftId ? { draftId } : {})}
