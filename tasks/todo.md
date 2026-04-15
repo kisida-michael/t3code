@@ -2,6 +2,24 @@
 
 ## Plan
 
+- [x] Inspect the GitHub Copilot model discovery path and replace the fragile CLI-help parsing that now misclassifies `text/json` as models.
+- [x] Add focused regression coverage for current Copilot CLI help output so `--output-format` choices cannot leak into the provider model list.
+- [x] Validate with `bun fmt`, `bun lint`, and `bun typecheck`.
+- [ ] Commit the fix, push a branch, and open a draft PR on the fork.
+
+## Notes
+
+- User has GitHub Copilot premium access, but T3 Code only exposes `text` and `json` as Copilot models because the local provider parses current CLI help incorrectly.
+
+## Review
+
+- Fixed [GitHubCopilotProvider.ts](/Users/michaelkisida/t3code/apps/server/src/provider/Layers/GitHubCopilotProvider.ts:1) so provider model discovery no longer scrapes `--output-format (choices: "text", "json")` as if those were model IDs.
+- Provider status now prefers real Copilot ACP session `configOptions` for model discovery, and only falls back to safe built-in models when the session probe is unavailable.
+- Added regression coverage in [ProviderRegistry.test.ts](/Users/michaelkisida/t3code/apps/server/src/provider/Layers/ProviderRegistry.test.ts:1) for both the current CLI help shape and ACP-derived model options.
+- Verified with `bun fmt`, `bun lint`, `bun typecheck`, and `cd apps/server && bun run test src/provider/Layers/ProviderRegistry.test.ts`.
+
+## Plan
+
 - [x] Inspect desktop update feed and release workflow assumptions to identify what blocks fork-based releases and updates.
 - [x] Patch local builds and GitHub Actions so desktop artifacts built from this fork target fork-hosted GitHub releases for updates.
 - [x] Enable the Release workflow on the fork and document the fork release process and remaining secret requirements.
