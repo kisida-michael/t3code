@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Config, Effect, FileSystem, Option, Path, Schema } from "effect";
@@ -118,7 +121,16 @@ const command = Command.make(
     ),
 ).pipe(Command.withDescription("Resolve nightly release version metadata."));
 
-if (import.meta.main) {
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) {
+    return false;
+  }
+
+  return resolve(entry) === fileURLToPath(import.meta.url);
+}
+
+if (isMainModule()) {
   Command.run(command, { version: "0.0.0" }).pipe(
     Effect.provide(NodeServices.layer),
     NodeRuntime.runMain,
