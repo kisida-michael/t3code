@@ -31,13 +31,18 @@ For normal upstream pulls, rebase the local overlay branch:
 
 ```bash
 scripts/update-local-copilot.sh rebase local/github-copilot upstream/main
+scripts/update-local-copilot.sh push
 ```
 
 If you are already on the overlay branch, you can omit the branch name:
 
 ```bash
 scripts/update-local-copilot.sh rebase
+scripts/update-local-copilot.sh push
 ```
+
+The push step uses `git push --force-with-lease` because rebasing rewrites the
+local overlay commit hashes by design.
 
 ## Rebuild flow
 
@@ -45,6 +50,7 @@ If the branch drifts too far or conflict resolution becomes noisy, rebuild the o
 
 ```bash
 scripts/update-local-copilot.sh refresh local/github-copilot upstream/main -- <commit> [<commit>...]
+scripts/update-local-copilot.sh push
 ```
 
 Example:

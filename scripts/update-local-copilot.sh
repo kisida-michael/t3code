@@ -7,6 +7,7 @@ usage() {
 Usage:
   scripts/update-local-copilot.sh rebase [branch] [upstream-ref]
   scripts/update-local-copilot.sh refresh <target-branch> [upstream-ref] -- <commit> [<commit>...]
+  scripts/update-local-copilot.sh push [remote] [branch]
   scripts/update-local-copilot.sh status
 
 Commands:
@@ -22,6 +23,12 @@ Commands:
     Example:
       scripts/update-local-copilot.sh refresh local/github-copilot upstream/main -- abc123 def456
 
+  push
+    Push the rewritten overlay branch safely with force-with-lease.
+    Defaults:
+      remote fork
+      branch current branch
+
   status
     Show the current branch, remotes, and rerere configuration.
 
@@ -33,6 +40,9 @@ Notes:
     or, during cherry-pick:
       git add <files>
       git cherry-pick --continue
+
+  After a successful rebase or refresh, update the fork branch with:
+      scripts/update-local-copilot.sh push
 EOF
 }
 
@@ -118,6 +128,18 @@ run_refresh() {
   git cherry-pick "$@"
 }
 
+run_push() {
+  local remote="${1:-fork}"
+  local branch="${2:-$(git branch --show-current)}"
+
+  if [[ -z "$branch" ]]; then
+    echo "No current branch detected. Pass the branch name explicitly." >&2
+    exit 1
+  fi
+
+  git push --force-with-lease "$remote" "$branch"
+}
+
 command="${1:-}"
 if [[ -z "$command" ]]; then
   usage
@@ -131,6 +153,9 @@ case "$command" in
     ;;
   refresh)
     run_refresh "$@"
+    ;;
+  push)
+    run_push "$@"
     ;;
   status)
     print_status
