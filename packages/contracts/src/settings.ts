@@ -74,10 +74,34 @@ export const ClaudeSettings = Schema.Struct({
 });
 export type ClaudeSettings = typeof ClaudeSettings.Type;
 
+export const DEFAULT_GITHUB_COPILOT_ACCOUNT_PROFILES = [
+  {
+    id: "personal",
+    name: "Personal",
+    configDir: "~/.copilot-personal",
+  },
+  {
+    id: "work",
+    name: "Work",
+    configDir: "~/.copilot-work",
+  },
+] as const;
+
+export const GitHubCopilotAccountProfile = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  configDir: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+});
+export type GitHubCopilotAccountProfile = typeof GitHubCopilotAccountProfile.Type;
+
 export const GitHubCopilotSettings = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   binaryPath: makeBinaryPathSetting("copilot"),
   configDir: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  selectedProfileId: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  profiles: Schema.Array(GitHubCopilotAccountProfile).pipe(
+    Schema.withDecodingDefault(Effect.succeed([...DEFAULT_GITHUB_COPILOT_ACCOUNT_PROFILES])),
+  ),
   customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 });
 export type GitHubCopilotSettings = typeof GitHubCopilotSettings.Type;
@@ -188,6 +212,8 @@ const GitHubCopilotSettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   binaryPath: Schema.optionalKey(Schema.String),
   configDir: Schema.optionalKey(Schema.String),
+  selectedProfileId: Schema.optionalKey(Schema.String),
+  profiles: Schema.optionalKey(Schema.Array(GitHubCopilotAccountProfile)),
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 

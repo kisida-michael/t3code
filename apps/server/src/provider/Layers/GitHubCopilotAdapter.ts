@@ -38,6 +38,7 @@ import {
   type GitHubCopilotAcpConnection,
   killGitHubCopilotChildProcess,
 } from "../githubCopilotAcp.ts";
+import { resolveGitHubCopilotConfigDir } from "../githubCopilotSettings.ts";
 import {
   ProviderAdapterProcessError,
   ProviderAdapterRequestError,
@@ -554,11 +555,12 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
         ),
       );
 
+      const configDir = resolveGitHubCopilotConfigDir(settings);
       const connection = yield* Effect.tryPromise({
         try: () =>
           createGitHubCopilotAcpConnection({
             binaryPath: settings.binaryPath,
-            ...(settings.configDir ? { configDir: settings.configDir } : {}),
+            ...(configDir ? { configDir } : {}),
             onRequestPermission: async (params: RequestPermissionRequest) => {
               const context = Array.from(sessions.values()).find(
                 (candidate) => candidate.acpSessionId === params.sessionId,

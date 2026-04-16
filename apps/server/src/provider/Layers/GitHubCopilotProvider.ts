@@ -23,6 +23,7 @@ import {
   createGitHubCopilotAcpConnection,
   killGitHubCopilotChildProcess,
 } from "../githubCopilotAcp";
+import { resolveGitHubCopilotConfigDir } from "../githubCopilotSettings";
 import { GitHubCopilotProvider } from "../Services/GitHubCopilotProvider";
 import { ServerSettingsService } from "../../serverSettings";
 
@@ -267,9 +268,10 @@ export const checkGitHubCopilotProviderStatus = Effect.fn("checkGitHubCopilotPro
 
     const sessionModelProbe = yield* Effect.tryPromise({
       try: async () => {
+        const configDir = resolveGitHubCopilotConfigDir(settings);
         const connection = await createGitHubCopilotAcpConnection({
           binaryPath: settings.binaryPath,
-          configDir: settings.configDir,
+          ...(configDir ? { configDir } : {}),
           onRequestPermission: async () => ({ outcome: { outcome: "cancelled" } }),
           onSessionUpdate: async () => {},
         });

@@ -99,7 +99,13 @@ function createBaseServerConfig(): ServerConfig {
       providers: {
         codex: { enabled: true, binaryPath: "", homePath: "", customModels: [] },
         claudeAgent: { enabled: true, binaryPath: "", customModels: [] },
-        githubCopilot: { enabled: true, binaryPath: "", configDir: "", customModels: [] },
+        githubCopilot: {
+          ...DEFAULT_SERVER_SETTINGS.providers.githubCopilot,
+          enabled: true,
+          binaryPath: "",
+          configDir: "",
+          customModels: [],
+        },
       },
     },
   };

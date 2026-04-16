@@ -2,6 +2,24 @@
 
 ## Plan
 
+- [x] Extend GitHub Copilot settings with named account profiles while preserving the existing raw `configDir` field for backward compatibility.
+- [x] Update server-side Copilot provider startup/status code to use the selected profile config dir when present, falling back to the raw config dir.
+- [x] Add a compact settings UI for choosing and editing personal/work Copilot profiles.
+- [x] Add focused tests for profile resolution and validate with `bun fmt`, `bun lint`, and `bun typecheck`.
+
+## Notes
+
+- User wants an easy in-T3 account switcher for GitHub Copilot, backed by separate Copilot config directories such as `~/.copilot-personal` and `~/.copilot-work`.
+
+## Review
+
+- Added named GitHub Copilot account profiles to server settings with default `Personal` and `Work` entries, while keeping the existing manual `configDir` fallback for older settings files.
+- Added [githubCopilotSettings.ts](/Users/michaelkisida/t3code/apps/server/src/provider/githubCopilotSettings.ts:1) so provider refresh and thread sessions resolve the same effective config directory, including `~/` expansion.
+- Updated [SettingsPanels.tsx](/Users/michaelkisida/t3code/apps/web/src/components/settings/SettingsPanels.tsx:1) with a Copilot account selector, editable profile rows, and an add/remove flow.
+- Verified with `bun fmt`, `bun lint`, `bun typecheck`, and `cd apps/server && bun run test src/provider/Layers/ProviderRegistry.test.ts`; lint still reports the same pre-existing unrelated warnings.
+
+## Plan
+
 - [x] Inspect the GitHub Copilot model discovery path and replace the fragile CLI-help parsing that now misclassifies `text/json` as models.
 - [x] Add focused regression coverage for current Copilot CLI help output so `--output-format` choices cannot leak into the provider model list.
 - [x] Validate with `bun fmt`, `bun lint`, and `bun typecheck`.
