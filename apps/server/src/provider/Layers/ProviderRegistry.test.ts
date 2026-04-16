@@ -1311,6 +1311,26 @@ Options:
         assert.match(resolved ?? "", /\/\.copilot-work$/);
       });
 
+      it("uses per-thread model option config dir before provider settings", () => {
+        const resolved = resolveGitHubCopilotConfigDir(
+          {
+            ...DEFAULT_SERVER_SETTINGS.providers.githubCopilot,
+            configDir: "/tmp/manual-copilot",
+            selectedProfileId: "work",
+            profiles: [
+              { id: "personal", name: "Personal", configDir: "~/.copilot-personal" },
+              { id: "work", name: "Work", configDir: "~/.copilot-work" },
+            ],
+          },
+          {
+            accountProfileId: "personal",
+            configDir: "~/.copilot-thread",
+          },
+        );
+
+        assert.match(resolved ?? "", /\/\.copilot-thread$/);
+      });
+
       it("falls back to manual config directory when no profile is selected", () => {
         const resolved = resolveGitHubCopilotConfigDir({
           ...DEFAULT_SERVER_SETTINGS.providers.githubCopilot,

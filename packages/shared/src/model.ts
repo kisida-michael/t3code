@@ -106,11 +106,15 @@ export function normalizeGitHubCopilotModelOptionsWithCapabilities(
   modelOptions: GitHubCopilotModelOptions | null | undefined,
 ): GitHubCopilotModelOptions | undefined {
   const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
-  const nextOptions: GitHubCopilotModelOptions = reasoningEffort
-    ? {
-        reasoningEffort: reasoningEffort as GitHubCopilotModelOptions["reasoningEffort"],
-      }
-    : {};
+  const accountProfileId = modelOptions?.accountProfileId?.trim();
+  const configDir = modelOptions?.configDir?.trim();
+  const nextOptions: GitHubCopilotModelOptions = {
+    ...(reasoningEffort
+      ? { reasoningEffort: reasoningEffort as GitHubCopilotModelOptions["reasoningEffort"] }
+      : {}),
+    ...(accountProfileId ? { accountProfileId } : {}),
+    ...(configDir ? { configDir } : {}),
+  };
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 }
 

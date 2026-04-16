@@ -1,6 +1,7 @@
 import type {
   ApprovalRequestId,
   EnvironmentId,
+  GitHubCopilotModelOptions,
   ModelSelection,
   ProjectEntry,
   ProviderApprovalDecision,
@@ -130,6 +131,112 @@ const runtimeModeConfig: Record<
 const runtimeModeOptions = Object.keys(runtimeModeConfig) as RuntimeMode[];
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const EMPTY_PROJECT_ENTRIES: ProjectEntry[] = [];
+const DEFAULT_GITHUB_COPILOT_ACCOUNT_VALUE = "__default__";
+
+function resolveGitHubCopilotAccountOptions(
+  settings: UnifiedSettings,
+  existingOptions: GitHubCopilotModelOptions | null | undefined,
+): GitHubCopilotModelOptions | undefined {
+  if (existingOptions?.accountProfileId || existingOptions?.configDir?.trim()) {
+    return existingOptions;
+  }
+
+  const githubCopilotSettings = settings.providers.githubCopilot;
+  const selectedProfile = githubCopilotSettings.selectedProfileId
+    ? githubCopilotSettings.profiles.find(
+        (profile) => profile.id === githubCopilotSettings.selectedProfileId,
+      )
+    : null;
+  const fallbackConfigDir = selectedProfile?.configDir || githubCopilotSettings.configDir;
+  const trimmedConfigDir = fallbackConfigDir.trim();
+
+  if (!selectedProfile && !trimmedConfigDir) {
+    return existingOptions ?? undefined;
+  }
+
+  return {
+    ...existingOptions,
+    ...(selectedProfile ? { accountProfileId: selectedProfile.id } : {}),
+    ...(trimmedConfigDir ? { configDir: trimmedConfigDir } : {}),
+  };
+}
+
+function getGitHubCopilotAccountLabel(
+  settings: UnifiedSettings,
+  modelOptions: GitHubCopilotModelOptions | null | undefined,
+): string {
+  const profileId =
+    modelOptions?.accountProfileId || settings.providers.githubCopilot.selectedProfileId;
+  const profile = profileId
+    ? settings.providers.githubCopilot.profiles.find((candidate) => candidate.id === profileId)
+    : null;
+  return profile?.name ?? "Default account";
+}
+
+const GitHubCopilotAccountPicker = memo(function GitHubCopilotAccountPicker(props: {
+  settings: UnifiedSettings;
+  modelOptions: GitHubCopilotModelOptions | null | undefined;
+  disabled: boolean;
+  onChange: (nextOptions: GitHubCopilotModelOptions | undefined) => void;
+}) {
+  const profileId =
+    props.modelOptions?.accountProfileId ||
+    props.settings.providers.githubCopilot.selectedProfileId;
+  const selectedValue = profileId || DEFAULT_GITHUB_COPILOT_ACCOUNT_VALUE;
+  const label = getGitHubCopilotAccountLabel(props.settings, props.modelOptions);
+
+  return (
+    <Select
+      value={selectedValue}
+      disabled={props.disabled}
+      onValueChange={(value) => {
+        const existing = props.modelOptions ?? {};
+        if (!value || value === DEFAULT_GITHUB_COPILOT_ACCOUNT_VALUE) {
+          const { accountProfileId: _, configDir: __, ...rest } = existing;
+          props.onChange(Object.keys(rest).length > 0 ? rest : undefined);
+          return;
+        }
+        const profile = props.settings.providers.githubCopilot.profiles.find(
+          (candidate) => candidate.id === value,
+        );
+        if (!profile) {
+          return;
+        }
+        props.onChange({
+          ...existing,
+          accountProfileId: profile.id,
+          configDir: profile.configDir,
+        });
+      }}
+    >
+      <SelectTrigger
+        variant="ghost"
+        size="sm"
+        className="shrink-0 font-medium text-muted-foreground/70 hover:text-foreground/80"
+        aria-label="GitHub Copilot account"
+        title={props.disabled ? "Copilot account is locked after the thread starts" : undefined}
+      >
+        <SelectValue>{label}</SelectValue>
+      </SelectTrigger>
+      <SelectPopup alignItemWithTrigger={false}>
+        <SelectItem value={DEFAULT_GITHUB_COPILOT_ACCOUNT_VALUE}>
+          <div className="grid gap-0.5">
+            <span>Default account</span>
+            <span className="text-muted-foreground text-xs">Use provider settings</span>
+          </div>
+        </SelectItem>
+        {props.settings.providers.githubCopilot.profiles.map((profile) => (
+          <SelectItem key={profile.id} value={profile.id}>
+            <div className="grid gap-0.5">
+              <span>{profile.name}</span>
+              <span className="text-muted-foreground text-xs">{profile.configDir}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
+});
 
 const extendReplacementRangeForTrailingSpace = (
   text: string,
@@ -462,7 +569,7 @@ export const ChatComposer = memo(
       activeThreadId,
       activeThreadEnvironmentId: _activeThreadEnvironmentId,
       activeThread,
-      isServerThread: _isServerThread,
+      isServerThread,
       isLocalDraftThread: _isLocalDraftThread,
       phase,
       isConnecting,
@@ -546,6 +653,7 @@ export const ChatComposer = memo(
       (store) => store.syncPersistedAttachments,
     );
     const getComposerDraft = useComposerDraftStore((store) => store.getComposerDraft);
+    const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
 
     // ------------------------------------------------------------------
     // Model state
@@ -568,6 +676,19 @@ export const ChatComposer = memo(
       projectModelSelection: activeProjectDefaultModelSelection,
       settings,
     });
+    const effectiveComposerModelOptions = useMemo(() => {
+      if (selectedProvider !== "githubCopilot") {
+        return composerModelOptions;
+      }
+      const githubCopilotOptions = resolveGitHubCopilotAccountOptions(
+        settings,
+        composerModelOptions?.githubCopilot,
+      );
+      return {
+        ...composerModelOptions,
+        ...(githubCopilotOptions ? { githubCopilot: githubCopilotOptions } : {}),
+      };
+    }, [composerModelOptions, selectedProvider, settings]);
 
     const selectedProviderModels = getProviderModels(providerStatuses, selectedProvider);
     const selectedProviderStatus = useMemo(
@@ -582,9 +703,15 @@ export const ChatComposer = memo(
           model: selectedModel,
           models: selectedProviderModels,
           prompt,
-          modelOptions: composerModelOptions,
+          modelOptions: effectiveComposerModelOptions,
         }),
-      [composerModelOptions, prompt, selectedModel, selectedProvider, selectedProviderModels],
+      [
+        effectiveComposerModelOptions,
+        prompt,
+        selectedModel,
+        selectedProvider,
+        selectedProviderModels,
+      ],
     );
 
     const selectedPromptEffort = composerProviderState.promptEffort;
@@ -897,7 +1024,7 @@ export const ChatComposer = memo(
       ...(routeKind === "draft" && draftId ? { draftId } : {}),
       model: selectedModel,
       models: selectedProviderModels,
-      modelOptions: composerModelOptions?.[selectedProvider],
+      modelOptions: effectiveComposerModelOptions?.[selectedProvider],
       prompt,
       onPromptChange: setPromptFromTraits,
     });
@@ -907,10 +1034,24 @@ export const ChatComposer = memo(
       ...(routeKind === "draft" && draftId ? { draftId } : {}),
       model: selectedModel,
       models: selectedProviderModels,
-      modelOptions: composerModelOptions?.[selectedProvider],
+      modelOptions: effectiveComposerModelOptions?.[selectedProvider],
       prompt,
       onPromptChange: setPromptFromTraits,
     });
+    const copilotAccountPicker =
+      selectedProvider === "githubCopilot" ? (
+        <GitHubCopilotAccountPicker
+          settings={settings}
+          modelOptions={effectiveComposerModelOptions?.githubCopilot}
+          disabled={isServerThread && (activeThread?.messages.length ?? 0) > 0}
+          onChange={(nextOptions) => {
+            setProviderModelOptions(composerDraftTarget, "githubCopilot", nextOptions, {
+              persistSticky: true,
+            });
+            scheduleComposerFocus();
+          }}
+        />
+      ) : null;
     const pendingPrimaryAction = useMemo(
       () =>
         activePendingProgress
@@ -1924,6 +2065,13 @@ export const ChatComposer = memo(
                       : {})}
                     onProviderModelChange={onProviderModelSelect}
                   />
+
+                  {copilotAccountPicker ? (
+                    <>
+                      <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+                      {copilotAccountPicker}
+                    </>
+                  ) : null}
 
                   {isComposerFooterCompact ? (
                     <CompactComposerControlsMenu

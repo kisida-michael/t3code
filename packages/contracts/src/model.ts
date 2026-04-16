@@ -16,6 +16,8 @@ export type CodexModelOptions = typeof CodexModelOptions.Type;
 
 export const GitHubCopilotModelOptions = Schema.Struct({
   reasoningEffort: Schema.optional(Schema.Literals(CODEX_REASONING_EFFORT_OPTIONS)),
+  accountProfileId: Schema.optional(Schema.String),
+  configDir: Schema.optional(Schema.String),
 });
 export type GitHubCopilotModelOptions = typeof GitHubCopilotModelOptions.Type;
 

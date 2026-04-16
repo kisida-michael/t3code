@@ -26,6 +26,25 @@ const CODEX_MODELS: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
+const GITHUB_COPILOT_MODELS: ReadonlyArray<ServerProviderModel> = [
+  {
+    slug: "gpt-5-mini",
+    name: "GPT-5 mini",
+    isCustom: false,
+    capabilities: {
+      reasoningEffortLevels: [
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium", isDefault: true },
+        { value: "high", label: "High" },
+      ],
+      supportsFastMode: false,
+      supportsThinkingToggle: false,
+      contextWindowOptions: [],
+      promptInjectedEffortLevels: [],
+    },
+  },
+];
+
 const CLAUDE_MODELS: ReadonlyArray<ServerProviderModel> = [
   {
     slug: "claude-opus-4-6",
@@ -197,6 +216,27 @@ describe("getComposerProviderState", () => {
         reasoningEffort: "high",
         fastMode: false,
       },
+    });
+  });
+
+  it("preserves GitHub Copilot account profile options for dispatch", () => {
+    const state = getComposerProviderState({
+      provider: "githubCopilot",
+      model: "gpt-5-mini",
+      models: GITHUB_COPILOT_MODELS,
+      prompt: "",
+      modelOptions: {
+        githubCopilot: {
+          accountProfileId: "work",
+          configDir: "~/.copilot-work",
+        },
+      },
+    });
+
+    expect(state.modelOptionsForDispatch).toEqual({
+      reasoningEffort: "medium",
+      accountProfileId: "work",
+      configDir: "~/.copilot-work",
     });
   });
 

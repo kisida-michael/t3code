@@ -2,6 +2,24 @@
 
 ## Plan
 
+- [x] Add GitHub Copilot account profile selection to per-thread model options so the chosen account is captured when a thread/session starts.
+- [x] Surface the Copilot profile selector in the composer UI only when GitHub Copilot is selected, and make it read-only after the thread has started.
+- [x] Update server session startup to prefer the per-thread Copilot profile over the global provider setting.
+- [x] Add focused tests for option persistence/normalization and validate with `bun fmt`, `bun lint`, `bun typecheck`, and the relevant server/web tests.
+
+## Notes
+
+- User wants GitHub Copilot personal/work profile selection in the composer controls, with the selected account locked after thread start.
+
+## Review
+
+- Added per-thread GitHub Copilot account fields to model options: `accountProfileId` and `configDir`, so the selected profile is stored with the thread model selection.
+- Added a GitHub Copilot account picker beside the provider/model picker in [ChatComposer.tsx](/Users/michaelkisida/t3code/apps/web/src/components/chat/ChatComposer.tsx:1); it appears only when GitHub Copilot is selected and becomes disabled after the server thread has messages.
+- Updated the Copilot adapter to prefer the thread’s model-option config directory over the global provider default when launching ACP.
+- Verified with `bun fmt`, `bun lint`, `bun typecheck`, `cd apps/server && bun run test src/provider/Layers/ProviderRegistry.test.ts`, and `cd apps/web && bun run test src/components/chat/composerProviderRegistry.test.tsx`; lint still reports the same unrelated pre-existing warnings.
+
+## Plan
+
 - [x] Extend GitHub Copilot settings with named account profiles while preserving the existing raw `configDir` field for backward compatibility.
 - [x] Update server-side Copilot provider startup/status code to use the selected profile config dir when present, falling back to the raw config dir.
 - [x] Add a compact settings UI for choosing and editing personal/work Copilot profiles.
