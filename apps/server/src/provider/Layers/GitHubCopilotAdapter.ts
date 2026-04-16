@@ -11,6 +11,7 @@ import {
   type ToolCallUpdate,
   type UsageUpdate,
 } from "@agentclientprotocol/sdk";
+import path from "node:path";
 import {
   ApprovalRequestId,
   type CanonicalItemType,
@@ -316,6 +317,35 @@ function permissionOutcomeFromDecision(
   }
 }
 
+function normalizeGitHubCopilotAgentPath(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim().replaceAll("\\", "/");
+  if (!trimmed || trimmed.startsWith("/") || trimmed.includes("\0")) {
+    return undefined;
+  }
+  const segments = trimmed.split("/");
+  if (segments.some((segment) => segment === "..")) {
+    return undefined;
+  }
+  if (!trimmed.startsWith(".github/agents/") || !trimmed.endsWith(".agent.md")) {
+    return undefined;
+  }
+  return trimmed;
+}
+
+function buildGitHubCopilotAgentPrompt(input: {
+  readonly agentName: string | undefined;
+  readonly agentPath: string;
+  readonly instructions: string;
+}): string {
+  const title = input.agentName?.trim() || path.basename(input.agentPath, ".agent.md");
+  return [
+    `Use the following GitHub Copilot custom agent instructions for this turn: ${title}.`,
+    `Source: ${input.agentPath}`,
+    "",
+    input.instructions.trim(),
+  ].join("\n");
+}
+
 const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function* (
   options?: GitHubCopilotAdapterLiveOptions,
 ) {
@@ -357,6 +387,7 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
   const buildSession = (input: {
     readonly threadId: ThreadId;
     readonly runtimeMode: ProviderSession["runtimeMode"];
+    readonly cwd: string | undefined;
     readonly model: string | undefined;
     readonly resumeCursor: string | undefined;
   }): ProviderSession => ({
@@ -364,6 +395,7 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
     status: "ready",
     runtimeMode: input.runtimeMode,
     threadId: input.threadId,
+    ...(input.cwd ? { cwd: input.cwd } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.resumeCursor ? { resumeCursor: input.resumeCursor } : {}),
     createdAt: nowIso(),
@@ -717,6 +749,7 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
         session: buildSession({
           threadId: input.threadId,
           runtimeMode: input.runtimeMode,
+          cwd: input.cwd,
           model: sessionResponse.models?.currentModelId ?? undefined,
           resumeCursor,
         }),
@@ -861,6 +894,50 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
 
     const inputText = input.input?.trim();
     const prompt: ContentBlock[] = [];
+    const githubCopilotSelection =
+      input.modelSelection?.provider === PROVIDER ? input.modelSelection : undefined;
+    const selectedAgentName = githubCopilotSelection?.options?.agentName?.trim();
+    const selectedAgentPath = normalizeGitHubCopilotAgentPath(
+      githubCopilotSelection?.options?.agentPath,
+    );
+    if (githubCopilotSelection?.options?.agentPath) {
+      if (!selectedAgentPath) {
+        return yield* toRequestError(
+          input.threadId,
+          "session/prompt",
+          new Error(
+            `Invalid GitHub Copilot agent path '${githubCopilotSelection.options.agentPath}'. Agents must be .github/agents/*.agent.md files.`,
+          ),
+        );
+      }
+    }
+    if (selectedAgentPath) {
+      const absoluteAgentPath = path.resolve(
+        context.session.cwd ?? process.cwd(),
+        selectedAgentPath,
+      );
+      const instructions = yield* fileSystem
+        .readFileString(absoluteAgentPath)
+        .pipe(
+          Effect.mapError((cause) =>
+            toRequestError(
+              input.threadId,
+              "session/prompt",
+              new Error(
+                `Failed to read GitHub Copilot agent '${selectedAgentPath}': ${cause.message}`,
+              ),
+            ),
+          ),
+        );
+      prompt.push({
+        type: "text",
+        text: buildGitHubCopilotAgentPrompt({
+          agentPath: selectedAgentPath,
+          agentName: selectedAgentName,
+          instructions,
+        }),
+      });
+    }
     if (inputText) {
       prompt.push({ type: "text", text: inputText });
     }
@@ -930,6 +1007,14 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
         ...(input.modelSelection?.provider === PROVIDER &&
         input.modelSelection.options?.reasoningEffort
           ? { effort: input.modelSelection.options.reasoningEffort }
+          : {}),
+        ...(selectedAgentPath
+          ? {
+              agent: {
+                path: selectedAgentPath,
+                ...(selectedAgentName ? { name: selectedAgentName } : {}),
+              },
+            }
           : {}),
       },
     });

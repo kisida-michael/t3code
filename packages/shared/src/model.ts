@@ -92,11 +92,15 @@ export function normalizeCodexModelOptionsWithCapabilities(
 ): CodexModelOptions | undefined {
   const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
   const fastMode = caps.supportsFastMode ? modelOptions?.fastMode : undefined;
+  const agentPath = modelOptions?.agentPath?.trim();
+  const agentName = modelOptions?.agentName?.trim();
   const nextOptions: CodexModelOptions = {
     ...(reasoningEffort
       ? { reasoningEffort: reasoningEffort as CodexModelOptions["reasoningEffort"] }
       : {}),
     ...(fastMode !== undefined ? { fastMode } : {}),
+    ...(agentPath ? { agentPath } : {}),
+    ...(agentName ? { agentName } : {}),
   };
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 }
@@ -108,12 +112,16 @@ export function normalizeGitHubCopilotModelOptionsWithCapabilities(
   const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
   const accountProfileId = modelOptions?.accountProfileId?.trim();
   const configDir = modelOptions?.configDir?.trim();
+  const agentPath = modelOptions?.agentPath?.trim();
+  const agentName = modelOptions?.agentName?.trim();
   const nextOptions: GitHubCopilotModelOptions = {
     ...(reasoningEffort
       ? { reasoningEffort: reasoningEffort as GitHubCopilotModelOptions["reasoningEffort"] }
       : {}),
     ...(accountProfileId ? { accountProfileId } : {}),
     ...(configDir ? { configDir } : {}),
+    ...(agentPath ? { agentPath } : {}),
+    ...(agentName ? { agentName } : {}),
   };
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 }

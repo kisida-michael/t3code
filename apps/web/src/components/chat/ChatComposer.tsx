@@ -1,5 +1,6 @@
 import type {
   ApprovalRequestId,
+  CodexModelOptions,
   EnvironmentId,
   GitHubCopilotModelOptions,
   ModelSelection,
@@ -132,6 +133,14 @@ const runtimeModeOptions = Object.keys(runtimeModeConfig) as RuntimeMode[];
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const EMPTY_PROJECT_ENTRIES: ProjectEntry[] = [];
 const DEFAULT_GITHUB_COPILOT_ACCOUNT_VALUE = "__default__";
+const DEFAULT_PROVIDER_AGENT_VALUE = "__default_agent__";
+
+interface ProviderAgentOption {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly description: string;
+}
 
 function resolveGitHubCopilotAccountOptions(
   settings: UnifiedSettings,
@@ -230,6 +239,138 @@ const GitHubCopilotAccountPicker = memo(function GitHubCopilotAccountPicker(prop
             <div className="grid gap-0.5">
               <span>{profile.name}</span>
               <span className="text-muted-foreground text-xs">{profile.configDir}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
+});
+
+function titleFromAgentFile(path: string): string {
+  const basename = basenameOfPath(path)
+    .replace(/\.agent\.md$/i, "")
+    .replace(/\.md$/i, "");
+  return basename
+    .split(/[-_\s]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function isGitHubCopilotAgentEntry(entry: ProjectEntry): boolean {
+  return (
+    entry.kind === "file" &&
+    entry.path.startsWith(".github/agents/") &&
+    entry.path.endsWith(".agent.md")
+  );
+}
+
+function isCodexProjectAgentEntry(entry: ProjectEntry): boolean {
+  return entry.kind === "file" && entry.path === "AGENTS.md";
+}
+
+function formatCodexGlobalAgentsPath(settings: UnifiedSettings): string {
+  const configuredHome = settings.providers.codex.homePath.trim() || "~/.codex";
+  return `${configuredHome.replace(/\/+$/, "")}/AGENTS.md`;
+}
+
+function buildProviderAgentOptions(input: {
+  provider: ProviderKind;
+  settings: UnifiedSettings;
+  entries: ReadonlyArray<ProjectEntry>;
+}): ProviderAgentOption[] {
+  switch (input.provider) {
+    case "githubCopilot":
+      return input.entries
+        .filter(isGitHubCopilotAgentEntry)
+        .toSorted((left, right) => left.path.localeCompare(right.path))
+        .map((entry) => ({
+          id: entry.path,
+          path: entry.path,
+          name: titleFromAgentFile(entry.path),
+          description: entry.path,
+        }));
+    case "codex": {
+      const projectAgents = input.entries.filter(isCodexProjectAgentEntry).map((entry) => ({
+        id: entry.path,
+        path: entry.path,
+        name: "Repository AGENTS.md",
+        description: entry.path,
+      }));
+      const globalPath = formatCodexGlobalAgentsPath(input.settings);
+      return [
+        ...projectAgents,
+        {
+          id: globalPath,
+          path: globalPath,
+          name: "Global AGENTS.md",
+          description: globalPath,
+        },
+      ];
+    }
+    case "claudeAgent":
+      return [];
+  }
+}
+
+const ProviderAgentPicker = memo(function ProviderAgentPicker(props: {
+  provider: ProviderKind;
+  options: ReadonlyArray<ProviderAgentOption>;
+  modelOptions:
+    | Pick<CodexModelOptions, "agentPath" | "agentName">
+    | Pick<GitHubCopilotModelOptions, "agentPath" | "agentName">
+    | null
+    | undefined;
+  disabled: boolean;
+  onChange: (agent: ProviderAgentOption | null) => void;
+}) {
+  const selectedPath = props.modelOptions?.agentPath;
+  const selectedOption = selectedPath
+    ? props.options.find((option) => option.path === selectedPath)
+    : null;
+  const selectedValue = selectedOption?.id ?? DEFAULT_PROVIDER_AGENT_VALUE;
+  const label = selectedOption?.name ?? props.modelOptions?.agentName ?? "Default agent";
+  const disabled = props.disabled || props.options.length === 0;
+  const providerLabel = props.provider === "githubCopilot" ? "GitHub Copilot" : "Codex";
+
+  return (
+    <Select
+      value={selectedValue}
+      disabled={disabled}
+      onValueChange={(value) => {
+        if (!value || value === DEFAULT_PROVIDER_AGENT_VALUE) {
+          props.onChange(null);
+          return;
+        }
+        const option = props.options.find((candidate) => candidate.id === value);
+        if (option) {
+          props.onChange(option);
+        }
+      }}
+    >
+      <SelectTrigger
+        variant="ghost"
+        size="sm"
+        className="max-w-48 shrink-0 font-medium text-muted-foreground/70 hover:text-foreground/80"
+        aria-label={`${providerLabel} agent`}
+        title={props.disabled ? "Agent is locked after the thread starts" : undefined}
+      >
+        <BotIcon className="size-3.5 shrink-0" />
+        <SelectValue>{label}</SelectValue>
+      </SelectTrigger>
+      <SelectPopup alignItemWithTrigger={false}>
+        <SelectItem value={DEFAULT_PROVIDER_AGENT_VALUE}>
+          <div className="grid gap-0.5">
+            <span>Default agent</span>
+            <span className="text-muted-foreground text-xs">Use provider defaults</span>
+          </div>
+        </SelectItem>
+        {props.options.map((option) => (
+          <SelectItem key={option.id} value={option.id}>
+            <div className="grid gap-0.5">
+              <span>{option.name}</span>
+              <span className="text-muted-foreground text-xs">{option.description}</span>
             </div>
           </SelectItem>
         ))}
@@ -829,6 +970,24 @@ export const ChatComposer = memo(
       }),
     );
     const workspaceEntries = workspaceEntriesQuery.data?.entries ?? EMPTY_PROJECT_ENTRIES;
+    const providerAgentsQuery = useQuery(
+      projectSearchEntriesQueryOptions({
+        environmentId,
+        cwd: gitCwd,
+        query: "agent.md",
+        enabled: selectedProvider === "codex" || selectedProvider === "githubCopilot",
+        limit: 200,
+      }),
+    );
+    const providerAgentOptions = useMemo(
+      () =>
+        buildProviderAgentOptions({
+          provider: selectedProvider,
+          settings,
+          entries: providerAgentsQuery.data?.entries ?? EMPTY_PROJECT_ENTRIES,
+        }),
+      [providerAgentsQuery.data?.entries, selectedProvider, settings],
+    );
 
     const composerMenuItems = useMemo<ComposerCommandItem[]>(() => {
       if (!composerTrigger) return [];
@@ -1048,6 +1207,55 @@ export const ChatComposer = memo(
             setProviderModelOptions(composerDraftTarget, "githubCopilot", nextOptions, {
               persistSticky: true,
             });
+            scheduleComposerFocus();
+          }}
+        />
+      ) : null;
+    const providerAgentPicker =
+      selectedProvider === "codex" || selectedProvider === "githubCopilot" ? (
+        <ProviderAgentPicker
+          provider={selectedProvider}
+          options={providerAgentOptions}
+          modelOptions={
+            selectedProvider === "codex"
+              ? effectiveComposerModelOptions?.codex
+              : effectiveComposerModelOptions?.githubCopilot
+          }
+          disabled={isServerThread && (activeThread?.messages.length ?? 0) > 0}
+          onChange={(agent) => {
+            if (selectedProvider === "codex") {
+              const existing = effectiveComposerModelOptions?.codex ?? {};
+              const { agentPath: _, agentName: __, ...rest } = existing;
+              const nextOptions = agent
+                ? {
+                    ...existing,
+                    agentPath: agent.path,
+                    agentName: agent.name,
+                  }
+                : rest;
+              setProviderModelOptions(
+                composerDraftTarget,
+                "codex",
+                Object.keys(nextOptions).length > 0 ? nextOptions : undefined,
+                { persistSticky: true },
+              );
+            } else {
+              const existing = effectiveComposerModelOptions?.githubCopilot ?? {};
+              const { agentPath: _, agentName: __, ...rest } = existing;
+              const nextOptions = agent
+                ? {
+                    ...existing,
+                    agentPath: agent.path,
+                    agentName: agent.name,
+                  }
+                : rest;
+              setProviderModelOptions(
+                composerDraftTarget,
+                "githubCopilot",
+                Object.keys(nextOptions).length > 0 ? nextOptions : undefined,
+                { persistSticky: true },
+              );
+            }
             scheduleComposerFocus();
           }}
         />
@@ -2070,6 +2278,13 @@ export const ChatComposer = memo(
                     <>
                       <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
                       {copilotAccountPicker}
+                    </>
+                  ) : null}
+
+                  {providerAgentPicker ? (
+                    <>
+                      <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+                      {providerAgentPicker}
                     </>
                   ) : null}
 

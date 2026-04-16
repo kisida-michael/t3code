@@ -567,11 +567,24 @@ function normalizeProviderModelOptions(
             (typeof legacy?.serviceTier === "string" && legacy.serviceTier === "fast")
           ? true
           : undefined;
+  const codexAgentPath =
+    typeof codexCandidate?.agentPath === "string" && codexCandidate.agentPath.trim().length > 0
+      ? codexCandidate.agentPath.trim()
+      : undefined;
+  const codexAgentName =
+    typeof codexCandidate?.agentName === "string" && codexCandidate.agentName.trim().length > 0
+      ? codexCandidate.agentName.trim()
+      : undefined;
   const codex =
-    codexReasoningEffort !== undefined || codexFastMode !== undefined
+    codexReasoningEffort !== undefined ||
+    codexFastMode !== undefined ||
+    codexAgentPath !== undefined ||
+    codexAgentName !== undefined
       ? {
           ...(codexReasoningEffort !== undefined ? { reasoningEffort: codexReasoningEffort } : {}),
           ...(codexFastMode !== undefined ? { fastMode: codexFastMode } : {}),
+          ...(codexAgentPath !== undefined ? { agentPath: codexAgentPath } : {}),
+          ...(codexAgentName !== undefined ? { agentName: codexAgentName } : {}),
         }
       : undefined;
 
@@ -623,10 +636,22 @@ function normalizeProviderModelOptions(
     githubCopilotCandidate.configDir.trim().length > 0
       ? githubCopilotCandidate.configDir.trim()
       : undefined;
+  const githubCopilotAgentPath =
+    typeof githubCopilotCandidate?.agentPath === "string" &&
+    githubCopilotCandidate.agentPath.trim().length > 0
+      ? githubCopilotCandidate.agentPath.trim()
+      : undefined;
+  const githubCopilotAgentName =
+    typeof githubCopilotCandidate?.agentName === "string" &&
+    githubCopilotCandidate.agentName.trim().length > 0
+      ? githubCopilotCandidate.agentName.trim()
+      : undefined;
   const githubCopilot =
     githubCopilotReasoningEffort !== undefined ||
     githubCopilotAccountProfileId !== undefined ||
-    githubCopilotConfigDir !== undefined
+    githubCopilotConfigDir !== undefined ||
+    githubCopilotAgentPath !== undefined ||
+    githubCopilotAgentName !== undefined
       ? {
           ...(githubCopilotReasoningEffort !== undefined
             ? { reasoningEffort: githubCopilotReasoningEffort }
@@ -635,6 +660,8 @@ function normalizeProviderModelOptions(
             ? { accountProfileId: githubCopilotAccountProfileId }
             : {}),
           ...(githubCopilotConfigDir !== undefined ? { configDir: githubCopilotConfigDir } : {}),
+          ...(githubCopilotAgentPath !== undefined ? { agentPath: githubCopilotAgentPath } : {}),
+          ...(githubCopilotAgentName !== undefined ? { agentName: githubCopilotAgentName } : {}),
         }
       : undefined;
 

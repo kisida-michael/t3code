@@ -166,6 +166,8 @@ export const DEFAULT_UNIFIED_SETTINGS: UnifiedSettings = {
 const CodexModelOptionsPatch = Schema.Struct({
   reasoningEffort: Schema.optionalKey(CodexModelOptions.fields.reasoningEffort),
   fastMode: Schema.optionalKey(CodexModelOptions.fields.fastMode),
+  agentPath: Schema.optionalKey(Schema.String),
+  agentName: Schema.optionalKey(Schema.String),
 });
 
 const ClaudeModelOptionsPatch = Schema.Struct({
@@ -179,6 +181,8 @@ const GitHubCopilotModelOptionsPatch = Schema.Struct({
   reasoningEffort: Schema.optionalKey(GitHubCopilotModelOptions.fields.reasoningEffort),
   accountProfileId: Schema.optionalKey(GitHubCopilotModelOptions.fields.accountProfileId),
   configDir: Schema.optionalKey(GitHubCopilotModelOptions.fields.configDir),
+  agentPath: Schema.optionalKey(Schema.String),
+  agentName: Schema.optionalKey(Schema.String),
 });
 
 const ModelSelectionPatch = Schema.Union([

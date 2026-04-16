@@ -10,6 +10,7 @@ import {
   isClaudeUltrathinkPrompt,
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeGitHubCopilotModelOptionsWithCapabilities,
   normalizeModelSlug,
   resolveApiModelId,
   resolveContextWindow,
@@ -280,6 +281,30 @@ describe("normalize*ModelOptionsWithCapabilities", () => {
       ),
     ).toEqual({
       thinking: true,
+    });
+  });
+
+  it("preserves selected provider agent references", () => {
+    expect(
+      normalizeCodexModelOptionsWithCapabilities(codexCaps, {
+        agentPath: " AGENTS.md ",
+        agentName: " Repository AGENTS.md ",
+      }),
+    ).toEqual({
+      reasoningEffort: "high",
+      agentPath: "AGENTS.md",
+      agentName: "Repository AGENTS.md",
+    });
+
+    expect(
+      normalizeGitHubCopilotModelOptionsWithCapabilities(codexCaps, {
+        agentPath: " .github/agents/reviewer.agent.md ",
+        agentName: " Reviewer ",
+      }),
+    ).toEqual({
+      reasoningEffort: "high",
+      agentPath: ".github/agents/reviewer.agent.md",
+      agentName: "Reviewer",
     });
   });
 });

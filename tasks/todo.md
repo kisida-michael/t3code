@@ -2,6 +2,36 @@
 
 ## Plan
 
+- [x] Discover project/global agent definitions per provider:
+  - GitHub Copilot project agents from `.github/agents/*.agent.md`.
+  - Codex project instructions from repository `AGENTS.md`.
+  - Codex global instructions from the configured `CODEX_HOME`/`~/.codex` `AGENTS.md`.
+- [x] Add schema/model-option support for storing the selected provider agent on new threads without breaking existing model selections.
+- [x] Add a compact agent picker beside the provider/model picker in the composer footer, scoped to the selected provider.
+- [x] Apply the selected provider agent during provider dispatch:
+  - For GitHub Copilot, prepend the selected `.agent.md` instructions to the prompt for ACP sessions.
+  - For Codex, rely on native `AGENTS.md` discovery while surfacing which project/global instruction file is active.
+- [x] Add focused option-normalization coverage and validate with `bun fmt`, `bun lint`, and `bun typecheck`.
+
+## Notes
+
+- User wants the selector in the composer toolbar shown in the screenshot.
+- GitHub Copilot custom agents live in `.github/agents/*.agent.md`.
+- Codex repo instructions live in project-root `AGENTS.md`; global instructions live under `~/.codex` or configured `CODEX_HOME`.
+- Visual thesis: restrained toolbar control matching the existing model/account controls, no extra panels or explanatory chrome.
+- Content plan: concise provider/model/agent controls in the footer, with source path detail in menu items.
+- Interaction thesis: selection uses the existing popover/menu behavior, scrolls horizontally on narrow composer widths, and does not resize the send/action area.
+
+## Review
+
+- Rebased `t3code/project-global-agents` onto latest `upstream/main` with `bun update:local-copilot rebase t3code/project-global-agents upstream/main`; resolved Copilot overlay conflicts and kept the branch clean before implementation.
+- Added provider agent fields to model options so selected Codex/Copilot agent references persist with new thread model selections.
+- Added a compact agent picker to the composer footer beside the provider/model and Copilot account controls. Copilot options come from `.github/agents/*.agent.md`; Codex shows repository `AGENTS.md` plus global `CODEX_HOME`/`~/.codex` `AGENTS.md`.
+- Updated the GitHub Copilot ACP adapter to validate selected `.github/agents/*.agent.md` paths, read the Markdown file from the active session cwd, and prepend those instructions to the prompt.
+- Verified with `bun fmt`, `bun lint`, `bun typecheck`, and `cd packages/shared && bun run test src/model.test.ts`. Lint still reports unrelated existing warnings, and server typecheck still prints existing Copilot Effect advisory messages while passing.
+
+## Plan
+
 - [x] Add GitHub Copilot account profile selection to per-thread model options so the chosen account is captured when a thread/session starts.
 - [x] Surface the Copilot profile selector in the composer UI only when GitHub Copilot is selected, and make it read-only after the thread has started.
 - [x] Update server session startup to prefer the per-thread Copilot profile over the global provider setting.
