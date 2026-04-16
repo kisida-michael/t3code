@@ -613,10 +613,28 @@ function normalizeProviderModelOptions(
     githubCopilotCandidate?.reasoningEffort === "xhigh"
       ? githubCopilotCandidate.reasoningEffort
       : undefined;
+  const githubCopilotAccountProfileId =
+    typeof githubCopilotCandidate?.accountProfileId === "string" &&
+    githubCopilotCandidate.accountProfileId.trim().length > 0
+      ? githubCopilotCandidate.accountProfileId.trim()
+      : undefined;
+  const githubCopilotConfigDir =
+    typeof githubCopilotCandidate?.configDir === "string" &&
+    githubCopilotCandidate.configDir.trim().length > 0
+      ? githubCopilotCandidate.configDir.trim()
+      : undefined;
   const githubCopilot =
-    githubCopilotReasoningEffort !== undefined
+    githubCopilotReasoningEffort !== undefined ||
+    githubCopilotAccountProfileId !== undefined ||
+    githubCopilotConfigDir !== undefined
       ? {
-          reasoningEffort: githubCopilotReasoningEffort,
+          ...(githubCopilotReasoningEffort !== undefined
+            ? { reasoningEffort: githubCopilotReasoningEffort }
+            : {}),
+          ...(githubCopilotAccountProfileId !== undefined
+            ? { accountProfileId: githubCopilotAccountProfileId }
+            : {}),
+          ...(githubCopilotConfigDir !== undefined ? { configDir: githubCopilotConfigDir } : {}),
         }
       : undefined;
 

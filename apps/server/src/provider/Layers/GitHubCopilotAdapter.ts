@@ -555,7 +555,10 @@ const makeGitHubCopilotAdapter = Effect.fn("makeGitHubCopilotAdapter")(function*
         ),
       );
 
-      const configDir = resolveGitHubCopilotConfigDir(settings);
+      const configDir = resolveGitHubCopilotConfigDir(
+        settings,
+        input.modelSelection?.provider === PROVIDER ? input.modelSelection.options : undefined,
+      );
       const connection = yield* Effect.tryPromise({
         try: () =>
           createGitHubCopilotAcpConnection({

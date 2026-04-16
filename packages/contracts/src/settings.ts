@@ -177,6 +177,8 @@ const ClaudeModelOptionsPatch = Schema.Struct({
 
 const GitHubCopilotModelOptionsPatch = Schema.Struct({
   reasoningEffort: Schema.optionalKey(GitHubCopilotModelOptions.fields.reasoningEffort),
+  accountProfileId: Schema.optionalKey(GitHubCopilotModelOptions.fields.accountProfileId),
+  configDir: Schema.optionalKey(GitHubCopilotModelOptions.fields.configDir),
 });
 
 const ModelSelectionPatch = Schema.Union([
