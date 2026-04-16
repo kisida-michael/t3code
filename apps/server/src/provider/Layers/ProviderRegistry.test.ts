@@ -31,6 +31,7 @@ import {
 } from "./CodexProvider";
 import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./ClaudeProvider";
 import { modelsFromSessionConfigOptions, parseModelsFromHelp } from "./GitHubCopilotProvider";
+import { resolveGitHubCopilotConfigDir } from "../githubCopilotSettings";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerConfig } from "../../config";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
@@ -1355,6 +1356,32 @@ Options:
           models.map((model) => model.slug),
           ["gpt-5.2", "claude-sonnet-4.6"],
         );
+      });
+    });
+
+    describe("resolveGitHubCopilotConfigDir", () => {
+      it("uses selected account profile before the manual config directory", () => {
+        const resolved = resolveGitHubCopilotConfigDir({
+          ...DEFAULT_SERVER_SETTINGS.providers.githubCopilot,
+          configDir: "/tmp/manual-copilot",
+          selectedProfileId: "work",
+          profiles: [
+            { id: "personal", name: "Personal", configDir: "~/.copilot-personal" },
+            { id: "work", name: "Work", configDir: "~/.copilot-work" },
+          ],
+        });
+
+        assert.match(resolved ?? "", /\/\.copilot-work$/);
+      });
+
+      it("falls back to manual config directory when no profile is selected", () => {
+        const resolved = resolveGitHubCopilotConfigDir({
+          ...DEFAULT_SERVER_SETTINGS.providers.githubCopilot,
+          configDir: "/tmp/manual-copilot",
+          selectedProfileId: "",
+        });
+
+        assert.strictEqual(resolved, "/tmp/manual-copilot");
       });
     });
   },

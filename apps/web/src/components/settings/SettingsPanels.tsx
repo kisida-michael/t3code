@@ -13,6 +13,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
   PROVIDER_DISPLAY_NAMES,
   type DesktopUpdateChannel,
+  type GitHubCopilotAccountProfile,
   type ScopedThreadRef,
   type ProviderKind,
   type ServerProvider,
@@ -135,6 +136,7 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
 ] as const;
 
 const GIT_TEXT_GENERATION_PROVIDERS: ReadonlyArray<ProviderKind> = ["codex", "claudeAgent"];
+const MANUAL_GITHUB_COPILOT_PROFILE_ID = "__manual__";
 
 const PROVIDER_STATUS_STYLES = {
   disabled: {
@@ -200,6 +202,14 @@ function getProviderSummary(provider: ServerProvider | undefined) {
   return {
     headline: "Available",
     detail: provider.message ?? "Installed and ready, but authentication could not be verified.",
+  };
+}
+
+function newGitHubCopilotProfile(): GitHubCopilotAccountProfile {
+  return {
+    id: `profile-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`,
+    name: "New profile",
+    configDir: "",
   };
 }
 
@@ -528,6 +538,12 @@ export function GeneralSettingsPanel() {
         DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.binaryPath ||
       settings.providers.githubCopilot.configDir !==
         DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.configDir ||
+      settings.providers.githubCopilot.selectedProfileId !==
+        DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.selectedProfileId ||
+      !Equal.equals(
+        settings.providers.githubCopilot.profiles,
+        DEFAULT_UNIFIED_SETTINGS.providers.githubCopilot.profiles,
+      ) ||
       settings.providers.githubCopilot.customModels.length > 0,
     ),
   });
@@ -1336,36 +1352,209 @@ export function GeneralSettingsPanel() {
                     ) : null}
 
                     {providerCard.provider === "githubCopilot" ? (
-                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
-                        <label
-                          htmlFor="provider-install-github-copilot-config-dir"
-                          className="block"
-                        >
+                      <div className="space-y-4 border-t border-border/60 px-4 py-3 sm:px-5">
+                        <div>
                           <span className="text-xs font-medium text-foreground">
-                            Copilot config directory
+                            GitHub Copilot account
                           </span>
-                          <Input
-                            id="provider-install-github-copilot-config-dir"
-                            className="mt-1.5"
-                            value={settings.providers.githubCopilot.configDir}
-                            onChange={(event) =>
+                          <Select
+                            value={
+                              settings.providers.githubCopilot.selectedProfileId ||
+                              MANUAL_GITHUB_COPILOT_PROFILE_ID
+                            }
+                            onValueChange={(value) =>
                               updateSettings({
                                 providers: {
                                   ...settings.providers,
                                   githubCopilot: {
                                     ...settings.providers.githubCopilot,
-                                    configDir: event.target.value,
+                                    selectedProfileId:
+                                      value && value !== MANUAL_GITHUB_COPILOT_PROFILE_ID
+                                        ? value
+                                        : "",
                                   },
                                 },
                               })
                             }
-                            placeholder="COPILOT_CONFIG_DIR"
-                            spellCheck={false}
-                          />
+                          >
+                            <SelectTrigger
+                              className="mt-1.5 w-full"
+                              aria-label="GitHub Copilot account profile"
+                            >
+                              <SelectValue>
+                                {settings.providers.githubCopilot.selectedProfileId
+                                  ? (settings.providers.githubCopilot.profiles.find(
+                                      (profile) =>
+                                        profile.id ===
+                                        settings.providers.githubCopilot.selectedProfileId,
+                                    )?.name ?? "Unknown profile")
+                                  : "Manual config directory"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectPopup align="start" alignItemWithTrigger={false}>
+                              <SelectItem hideIndicator value={MANUAL_GITHUB_COPILOT_PROFILE_ID}>
+                                Manual config directory
+                              </SelectItem>
+                              {settings.providers.githubCopilot.profiles.map((profile) => (
+                                <SelectItem hideIndicator key={profile.id} value={profile.id}>
+                                  {profile.name}
+                                </SelectItem>
+                              ))}
+                            </SelectPopup>
+                          </Select>
                           <span className="mt-1 block text-xs text-muted-foreground">
-                            Optional custom config directory passed to `copilot --config-dir`.
+                            Pick which Copilot login profile new GitHub Copilot sessions should use.
                           </span>
-                        </label>
+                        </div>
+
+                        {!settings.providers.githubCopilot.selectedProfileId ? (
+                          <label
+                            htmlFor="provider-install-github-copilot-config-dir"
+                            className="block"
+                          >
+                            <span className="text-xs font-medium text-foreground">
+                              Manual config directory
+                            </span>
+                            <Input
+                              id="provider-install-github-copilot-config-dir"
+                              className="mt-1.5"
+                              value={settings.providers.githubCopilot.configDir}
+                              onChange={(event) =>
+                                updateSettings({
+                                  providers: {
+                                    ...settings.providers,
+                                    githubCopilot: {
+                                      ...settings.providers.githubCopilot,
+                                      configDir: event.target.value,
+                                    },
+                                  },
+                                })
+                              }
+                              placeholder="COPILOT_CONFIG_DIR"
+                              spellCheck={false}
+                            />
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              Used only when no named Copilot account profile is selected.
+                            </span>
+                          </label>
+                        ) : null}
+
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-foreground">
+                              Account profiles
+                            </span>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => {
+                                const profile = newGitHubCopilotProfile();
+                                updateSettings({
+                                  providers: {
+                                    ...settings.providers,
+                                    githubCopilot: {
+                                      ...settings.providers.githubCopilot,
+                                      selectedProfileId: profile.id,
+                                      profiles: [
+                                        ...settings.providers.githubCopilot.profiles,
+                                        profile,
+                                      ],
+                                    },
+                                  },
+                                });
+                              }}
+                            >
+                              <PlusIcon className="mr-1 size-3" />
+                              Add
+                            </Button>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {settings.providers.githubCopilot.profiles.map((profile) => (
+                              <div
+                                key={profile.id}
+                                className="grid gap-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:grid-cols-[minmax(8rem,0.8fr)_minmax(12rem,1.2fr)_auto]"
+                              >
+                                <Input
+                                  value={profile.name}
+                                  aria-label={`${profile.name} Copilot profile name`}
+                                  onChange={(event) =>
+                                    updateSettings({
+                                      providers: {
+                                        ...settings.providers,
+                                        githubCopilot: {
+                                          ...settings.providers.githubCopilot,
+                                          profiles: settings.providers.githubCopilot.profiles.map(
+                                            (candidate) =>
+                                              candidate.id === profile.id
+                                                ? { ...candidate, name: event.target.value }
+                                                : candidate,
+                                          ),
+                                        },
+                                      },
+                                    })
+                                  }
+                                  placeholder="Profile name"
+                                  spellCheck={false}
+                                />
+                                <Input
+                                  value={profile.configDir}
+                                  aria-label={`${profile.name} Copilot config directory`}
+                                  onChange={(event) =>
+                                    updateSettings({
+                                      providers: {
+                                        ...settings.providers,
+                                        githubCopilot: {
+                                          ...settings.providers.githubCopilot,
+                                          profiles: settings.providers.githubCopilot.profiles.map(
+                                            (candidate) =>
+                                              candidate.id === profile.id
+                                                ? { ...candidate, configDir: event.target.value }
+                                                : candidate,
+                                          ),
+                                        },
+                                      },
+                                    })
+                                  }
+                                  placeholder="~/.copilot-personal"
+                                  spellCheck={false}
+                                />
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  className="justify-self-end text-muted-foreground hover:text-foreground"
+                                  onClick={() =>
+                                    updateSettings({
+                                      providers: {
+                                        ...settings.providers,
+                                        githubCopilot: {
+                                          ...settings.providers.githubCopilot,
+                                          selectedProfileId:
+                                            settings.providers.githubCopilot.selectedProfileId ===
+                                            profile.id
+                                              ? ""
+                                              : settings.providers.githubCopilot.selectedProfileId,
+                                          profiles:
+                                            settings.providers.githubCopilot.profiles.filter(
+                                              (candidate) => candidate.id !== profile.id,
+                                            ),
+                                        },
+                                      },
+                                    })
+                                  }
+                                  aria-label={`Remove ${profile.name} Copilot profile`}
+                                >
+                                  <XIcon className="size-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <span className="mt-2 block text-xs text-muted-foreground">
+                            Authenticate each directory once with `copilot login --config-dir`.
+                            Paths starting with `~/` are expanded by the server before launching
+                            Copilot.
+                          </span>
+                        </div>
                       </div>
                     ) : null}
 
